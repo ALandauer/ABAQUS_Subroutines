@@ -89,7 +89,7 @@ C     Local variables
         double precision B(NDOFEL)           !
         double precision B_temp(NDOFEL)           ! 
         double precision b_loc(MCRD)         !
-        double precision diracD              !
+        double precision diracD,C1              !
         integer precision kint0,count1,count2
  
 
@@ -111,7 +111,7 @@ C
        x0(1:3) = PROPS(6:8)
 
        diracD = 0.d0
-C      count1 = 0
+       C1 = 0.d0
 C      count2 = 0
 C     write(6,*) TIME(2)
        RHS(1:NDOFEL,1) = 0.d0
@@ -146,26 +146,32 @@ C      write(6,*) COORDS
 C
        DO kint0=1,n_points
 
-        x = xi(1:MCRD,kint0)
 C      write(6,*) xi
       call calculate_shapefunctions(xi(1:MCRD,kint0),nnode,MCRD,N,dNdxi)
-C       dxdxi = matmul(COORDS(1:MCRD,1:nnode),dNdxi(1:nnode,1:MCRD))
-C       call invert_small(dxdxi,dxidx,determinant)
-C       dNdx(1:nnode,1:MCRD) = matmul(dNdxi(1:nnode,1:MCRD),dxidx)
+       dxdxi = matmul(COORDS(1:MCRD,1:nnode),dNdxi(1:nnode,1:MCRD))
+       call invert_small(MCRD,dxdxi,dxidx,determinant)
+       dNdx(1:nnode,1:MCRD) = matmul(dNdxi(1:nnode,1:MCRD),dxidx)
+C      write(6,*) 'determinant'
 C      write(6,*) determinant
-       x(1:MCRD)) = matmul(COORD(1:MCRD,1:NNODE),N(1:NNODE))
-C1 = dot_product(x(1:MCRD)-X0(1:MCRD),axis(1:MCRD))
-b_loc(1:MCRD) = -rho*Omega*Omega*((X(1:MCRD)-x0(1:MCRD) - C1*axis(1:MCRD))
+	  
+      x(1:MCRD) = matmul(COORDS(1:MCRD,1:NNODE),N(1:NNODE))
+	  
+      C1 = dot_product(x(1:MCRD)-x0(1:MCRD),axis(1:MCRD))
+      b_loc(1:MCRD) = -rho*Omega*Omega*((x(1:MCRD)-x0(1:MCRD))
+     1 -C1*axis(1:MCRD))
 
-       B_temp = 0.d0
-       do m = 1,nnode
-        do i = 1,MCRD
-C         write(6,*) b_loc
-         B_temp((m*MCRD-(MCRD-1)):m*MCRD) = B_temp(.....)+b_loc(1:MCRD)*N(m)*w(kint0)*determinant
+C     B_temp = 0.d0
+      do m = 1,nnode
+       do i = 1,MCRD
+C       write(6,*) b_loc
+      B_temp((m*MCRD-(MCRD-1)):m*MCRD)=B_temp((m*MCRD-(MCRD-1)):m*MCRD)
+     1   +b_loc(1:MCRD)*N(m)*w(kint0)*determinant
 C        write(6,*) B_temp
-       end do !m
-end do
+       end do !i
+      end do !m
 C       write(6,*) B_temp
+
+
         do m = 1,nnode        
          do q = 1,nnode
           do i = 1,MCRD
@@ -178,8 +184,9 @@ C       write(6,*) B_temp
             STIF_loc(i,k) = N(m)*N(q)*(diracD-axis(i)*axis(k))
            end do
           end do		
-          STIF_temp((m*MCRD-(MCRD-1)):m*MCRD,(q*MCRD-(MCRD-1)):q*MCRD) =
-     1     STIF_loc(1:MCRD,1:MCRD)
+       STIF_temp((m*MCRD-(MCRD-1)):m*MCRD,(q*MCRD-(MCRD-1)):q*MCRD) =
+     1   STIF_temp((m*MCRD-(MCRD-1)):m*MCRD,(q*MCRD-(MCRD-1)):q*MCRD) +
+     2   STIF_loc(1:MCRD,1:MCRD)*w(kint0)*determinant
          end do
         end do
 
@@ -189,12 +196,15 @@ C      B = B + B_temp*w(kint0)*determinant
  
        END DO
 
-      STIF(1:nnode*MCRD,1:nnode*MCRD) = STIF_temp*(-rho*Omega**2.d0)
-      STIF(1:NDOFEL,1:NDOFEL) = 0.d0
+      STIF(1:nnode*MCRD,1:nnode*MCRD) = STIF_temp*(-rho*Omega*Omega)
+	  
+C      STIF(1:NDOFEL,1:NDOFEL) = 0.d0
+	  
        RHS(1:NDOFEL,1) = -B_temp(1:NDOFEL)
-      write(6,*) ' RHS'
-      write(6,*) RHS(1:NDOFEL))
-C     write(6,*) MCRD
+      write(6,*) 'STIF'
+      write(6,*) STIF(1:nnode*MCRD,1:nnode*MCRD)
+C      write(6,*) RHS(1:NDOFEL,1)
+C      write(6,*) MCRD
        RETURN
        END
 
